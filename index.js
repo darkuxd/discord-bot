@@ -32,7 +32,7 @@ const ROLE_2 = '1515824249871270051';
 client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
 
-    // ================= VERIFY PANEL =================
+    // ================= VERIFY PANEL (UNCHANGED LOGIC) =================
     const verifyChannel = await client.channels.fetch(VERIFY_CHANNEL_ID);
 
     const verifyEmbed = new EmbedBuilder()
@@ -57,7 +57,7 @@ client.once('ready', async () => {
         components: [verifyRow]
     });
 
-    // ================= TICKET PANEL =================
+    // ================= TICKET PANEL (UNCHANGED CONTENT) =================
     const ticketChannel = await client.channels.fetch(TICKET_PANEL_CHANNEL_ID);
 
     const ticketEmbed = new EmbedBuilder()
@@ -75,7 +75,7 @@ client.once('ready', async () => {
     console.log('✅ Panels sent');
 });
 
-// ===== CHECK IF USER HAS OPEN TICKET =====
+// ===== FIXED: CHECK OPEN TICKETS (REAL SAFE VERSION) =====
 async function userHasTicket(guild, userId) {
     const channels = await guild.channels.fetch();
 
@@ -83,7 +83,7 @@ async function userHasTicket(guild, userId) {
         ch &&
         ch.name &&
         ch.name.startsWith('ticket-') &&
-        ch.permissionOverwrites.cache.some(p => p.id === userId)
+        ch.permissionOverwrites.cache?.some(po => po.id === userId)
     );
 }
 
@@ -124,7 +124,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const guild = interaction.guild;
         const userId = interaction.user.id;
 
-        // ❌ CHECK IF USER ALREADY HAS TICKET
+        // ❌ BLOCK IF TICKET EXISTS
         const hasTicket = await userHasTicket(guild, userId);
 
         if (hasTicket) {
