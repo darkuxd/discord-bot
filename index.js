@@ -18,7 +18,7 @@ const client = new Client({
     ]
 });
 
-// ===== IDs =====
+// ===== IDS =====
 const VERIFY_CHANNEL_ID = '1515833574639669388';
 const VERIFY_ROLE_ID = '1515831883425124412';
 
@@ -28,11 +28,11 @@ const TICKET_CATEGORY_ID = '1516043869257597023';
 const ROLE_1 = '1515830402491879584';
 const ROLE_2 = '1515824249871270051';
 
-// ===== READY =====
+// ================= READY =================
 client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
 
-    // ================= VERIFY PANEL (UNCHANGED LOGIC) =================
+    // ================= VERIFY PANEL =================
     const verifyChannel = await client.channels.fetch(VERIFY_CHANNEL_ID);
 
     const verifyEmbed = new EmbedBuilder()
@@ -45,25 +45,25 @@ client.once('ready', async () => {
         .setLabel('Verify')
         .setStyle(ButtonStyle.Success);
 
-    const ticketButton = new ButtonBuilder()
-        .setCustomId('open_ticket')
-        .setLabel('Create Ticket')
-        .setStyle(ButtonStyle.Primary);
-
-    const verifyRow = new ActionRowBuilder().addComponents(verifyButton, ticketButton);
+    const verifyRow = new ActionRowBuilder().addComponents(verifyButton);
 
     await verifyChannel.send({
         embeds: [verifyEmbed],
         components: [verifyRow]
     });
 
-    // ================= TICKET PANEL (UNCHANGED CONTENT) =================
+    // ================= TICKET PANEL =================
     const ticketChannel = await client.channels.fetch(TICKET_PANEL_CHANNEL_ID);
 
     const ticketEmbed = new EmbedBuilder()
         .setColor('#ff6600')
         .setTitle('🎫 Ticket System')
         .setDescription('Spausk mygtuką norėdamas sukurti ticket.');
+
+    const ticketButton = new ButtonBuilder()
+        .setCustomId('open_ticket')
+        .setLabel('Create Ticket')
+        .setStyle(ButtonStyle.Primary);
 
     const ticketRow = new ActionRowBuilder().addComponents(ticketButton);
 
@@ -75,7 +75,7 @@ client.once('ready', async () => {
     console.log('✅ Panels sent');
 });
 
-// ===== FIXED: CHECK OPEN TICKETS (REAL SAFE VERSION) =====
+// ================= CHECK IF USER HAS TICKET =================
 async function userHasTicket(guild, userId) {
     const channels = await guild.channels.fetch();
 
@@ -87,7 +87,7 @@ async function userHasTicket(guild, userId) {
     );
 }
 
-// ===== GET NEXT TICKET NUMBER =====
+// ================= GET NEXT TICKET NUMBER =================
 async function getNextTicketNumber(guild) {
     const channels = await guild.channels.fetch();
     let max = 0;
@@ -102,7 +102,7 @@ async function getNextTicketNumber(guild) {
     return max + 1;
 }
 
-// ===== INTERACTIONS =====
+// ================= INTERACTIONS =================
 client.on(Events.InteractionCreate, async interaction => {
 
     // ================= VERIFY =================
@@ -118,13 +118,13 @@ client.on(Events.InteractionCreate, async interaction => {
         });
     }
 
-    // ================= CREATE TICKET =================
+    // ================= OPEN TICKET =================
     if (interaction.isButton() && interaction.customId === 'open_ticket') {
 
         const guild = interaction.guild;
         const userId = interaction.user.id;
 
-        // ❌ BLOCK IF TICKET EXISTS
+        // ❌ BLOCK IF USER ALREADY HAS TICKET
         const hasTicket = await userHasTicket(guild, userId);
 
         if (hasTicket) {
