@@ -22,11 +22,11 @@ const client = new Client({
 const VERIFY_CHANNEL_ID = '1515833574639669388';
 const VERIFY_ROLE_ID = '1515831883425124412';
 
-const TICKET_PANEL_CHANNEL_ID = '1515828291695673405'; // 👈 NEW CHANNEL FOR TICKET EMBED
+const TICKET_PANEL_CHANNEL_ID = '1515828291695673405';
 const TICKET_CATEGORY_ID = '1516043869257597023';
 
-const SUPPORT_ROLE_1 = '1515830402491879584';
-const SUPPORT_ROLE_2 = '1515824249871270051';
+const STAFF_ROLE_1 = '1515830402491879584';
+const STAFF_ROLE_2 = '1515824249871270051';
 
 // ===== READY =====
 client.once('ready', async () => {
@@ -47,11 +47,6 @@ client.once('ready', async () => {
         .setLabel('Verify')
         .setStyle(ButtonStyle.Success);
 
-    const ticketButton = new ButtonBuilder()
-        .setCustomId('open_ticket')
-        .setLabel('Open Ticket')
-        .setStyle(ButtonStyle.Primary);
-
     const verifyRow = new ActionRowBuilder().addComponents(verifyButton);
 
     await verifyChannel.send({
@@ -60,19 +55,27 @@ client.once('ready', async () => {
     });
 
     // =========================
-    // TICKET PANEL (NEW CHANNEL)
+    // PURCHASE / TICKET PANEL
     // =========================
     const ticketChannel = await client.channels.fetch(TICKET_PANEL_CHANNEL_ID);
 
-    const ticketEmbed = new EmbedBuilder()
-        .setColor('#ff0000')
-        .setTitle('🎫 Support Tickets')
-        .setDescription('Jei reikia pagalbos, spausk mygtuką žemiau ir sukurk ticket.');
+    const ticketPanelEmbed = new EmbedBuilder()
+        .setColor('#ff6600')
+        .setTitle('🛒 Purchase / Pirkti Sistema')
+        .setDescription(
+            'Norėdami pateikti užsakymą arba paklausti apie prekę, spauskite mygtuką žemiau.\n\n' +
+            'To place an order or ask about a product, click the button below.'
+        );
+
+    const ticketButton = new ButtonBuilder()
+        .setCustomId('open_ticket')
+        .setLabel('Create Purchase Ticket')
+        .setStyle(ButtonStyle.Primary);
 
     const ticketRow = new ActionRowBuilder().addComponents(ticketButton);
 
     await ticketChannel.send({
-        embeds: [ticketEmbed],
+        embeds: [ticketPanelEmbed],
         components: [ticketRow]
     });
 
@@ -98,7 +101,7 @@ async function getNextTicketNumber(guild) {
 client.on(Events.InteractionCreate, async interaction => {
 
     // =========================
-    // VERIFY
+    // VERIFY SYSTEM
     // =========================
     if (interaction.isButton() && interaction.customId === 'verify_button') {
 
@@ -106,10 +109,6 @@ client.on(Events.InteractionCreate, async interaction => {
 
         if (!role) {
             return interaction.reply({ content: 'Role not found.', ephemeral: true });
-        }
-
-        if (interaction.member.roles.cache.has(VERIFY_ROLE_ID)) {
-            return interaction.reply({ content: 'Jau verified.', ephemeral: true });
         }
 
         await interaction.member.roles.add(role);
@@ -121,7 +120,7 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     // =========================
-    // OPEN TICKET
+    // CREATE PURCHASE TICKET
     // =========================
     if (interaction.isButton() && interaction.customId === 'open_ticket') {
 
@@ -149,7 +148,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     ]
                 },
                 {
-                    id: SUPPORT_ROLE_1,
+                    id: STAFF_ROLE_1,
                     allow: [
                         PermissionsBitField.Flags.ViewChannel,
                         PermissionsBitField.Flags.SendMessages,
@@ -157,7 +156,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     ]
                 },
                 {
-                    id: SUPPORT_ROLE_2,
+                    id: STAFF_ROLE_2,
                     allow: [
                         PermissionsBitField.Flags.ViewChannel,
                         PermissionsBitField.Flags.SendMessages,
@@ -168,9 +167,12 @@ client.on(Events.InteractionCreate, async interaction => {
         });
 
         const ticketEmbed = new EmbedBuilder()
-            .setColor('Red')
-            .setTitle(`🎫 Ticket #${ticketNumber}`)
-            .setDescription('Parašyk savo problemą čia. Support komanda greitai atsakys.');
+            .setColor('#ff6600')
+            .setTitle(`🛒 Purchase Ticket #${ticketNumber}`)
+            .setDescription(
+                'Parašyk ką nori pirkti / klausti apie produktą.\n\n' +
+                'Write what you want to buy or ask about.'
+            );
 
         const closeButton = new ButtonBuilder()
             .setCustomId('close_ticket')
@@ -186,7 +188,7 @@ client.on(Events.InteractionCreate, async interaction => {
         });
 
         return interaction.reply({
-            content: `🎫 Ticket created: ${channel}`,
+            content: `🛒 Purchase ticket created: ${channel}`,
             ephemeral: true
         });
     }
@@ -199,7 +201,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const channel = interaction.channel;
 
         await interaction.reply({
-            content: '🔒 Ticket closing...',
+            content: '🔒 Closing ticket...',
             ephemeral: true
         });
 
