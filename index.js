@@ -55,7 +55,7 @@ client.once('ready', async () => {
         components: [verifyRow]
     });
 
-    // ================= TICKET PANEL (CATEGORY MENU) =================
+    // ================= TICKET PANEL =================
     const ticketChannel = await client.channels.fetch(TICKET_PANEL_CHANNEL_ID);
 
     const ticketEmbed = new EmbedBuilder()
@@ -69,18 +69,13 @@ client.once('ready', async () => {
         .addOptions(
             {
                 label: 'Buy / Pirkti',
-                value: 'buy',
+                value: 'pirkti',
                 emoji: '🛒'
             },
             {
                 label: 'Support',
                 value: 'support',
                 emoji: '🛠️'
-            },
-            {
-                label: 'Refund',
-                value: 'refund',
-                emoji: '💸'
             }
         );
 
@@ -100,19 +95,17 @@ async function userHasTicket(guild, userId) {
 
     return channels.some(ch =>
         ch &&
-        ch.name &&
-        ch.name.startsWith('ticket-') &&
         ch.permissionOverwrites.cache?.some(po => po.id === userId)
     );
 }
 
-// ================= GET TICKET NUMBER =================
-async function getNextTicketNumber(guild) {
+// ================= COUNT CATEGORY TICKETS =================
+async function getCategoryTicketNumber(guild, category) {
     const channels = await guild.channels.fetch();
     let max = 0;
 
     channels.forEach(ch => {
-        if (ch && ch.name && ch.name.startsWith('ticket-')) {
+        if (ch && ch.name && ch.name.startsWith(`${category}-`)) {
             const num = parseInt(ch.name.split('-')[1]);
             if (!isNaN(num) && num > max) max = num;
         }
@@ -136,10 +129,10 @@ async function createTicket(interaction, type) {
         });
     }
 
-    const ticketNumber = await getNextTicketNumber(guild);
+    const ticketNumber = await getCategoryTicketNumber(guild, type);
 
     const channel = await guild.channels.create({
-        name: `ticket-${ticketNumber}`,
+        name: `${type}-${ticketNumber}`,
         type: 0,
         parent: TICKET_CATEGORY_ID,
         permissionOverwrites: [
@@ -174,12 +167,11 @@ async function createTicket(interaction, type) {
         ]
     });
 
-    // ================= TICKET EMBED =================
     const embed = new EmbedBuilder()
         .setColor('#ff6600')
-        .setTitle(`🎫 Ticket #${ticketNumber}`)
+        .setTitle(`🎫 ${type.toUpperCase()} Ticket #${ticketNumber}`)
         .setDescription(
-            `📦 Type: **${type.toUpperCase()}**\n\n` +
+            `📦 Category: **${type.toUpperCase()}**\n\n` +
             `👋 Parašyk savo užklausą.\n` +
             `💬 Staff greitai atsakys.`
         );
@@ -206,7 +198,7 @@ async function createTicket(interaction, type) {
         .addFields(
             { name: 'User', value: `<@${userId}>`, inline: true },
             { name: 'Type', value: type, inline: true },
-            { name: 'Channel', value: `${channel}` }
+            { name: 'Channel', value: `${channel.name}` }
         )
         .setTimestamp();
 
