@@ -8,7 +8,8 @@ const {
     ButtonBuilder,
     ButtonStyle,
     Events,
-    PermissionsBitField
+    PermissionsBitField,
+    StringSelectMenuBuilder
 } = require('discord.js');
 
 const client = new Client({
@@ -18,12 +19,14 @@ const client = new Client({
     ]
 });
 
-// ===== IDs =====
+// ===== IDS =====
 const VERIFY_CHANNEL_ID = '1515833574639669388';
 const VERIFY_ROLE_ID = '1515831883425124412';
 
 const TICKET_PANEL_CHANNEL_ID = '1515828291695673405';
 const TICKET_CATEGORY_ID = '1516043869257597023';
+
+const LOG_CHANNEL_ID = '1515828465528471562';
 
 const ROLE_1 = '1515830402491879584';
 const ROLE_2 = '1515824249871270051';
@@ -52,30 +55,46 @@ client.once('ready', async () => {
         components: [verifyRow]
     });
 
-    // ================= TICKET PANEL =================
+    // ================= TICKET PANEL (CATEGORY MENU) =================
     const ticketChannel = await client.channels.fetch(TICKET_PANEL_CHANNEL_ID);
 
     const ticketEmbed = new EmbedBuilder()
         .setColor('#ff6600')
         .setTitle('🎫 Ticket System')
-        .setDescription('Spausk mygtuką norėdamas sukurti ticket.');
+        .setDescription('Pasirink kategoriją prieš kuriant ticket.');
 
-    const ticketButton = new ButtonBuilder()
-        .setCustomId('open_ticket')
-        .setLabel('Create Ticket')
-        .setStyle(ButtonStyle.Primary);
+    const menu = new StringSelectMenuBuilder()
+        .setCustomId('ticket_category')
+        .setPlaceholder('🎯 Pasirink ticket tipą')
+        .addOptions(
+            {
+                label: 'Buy / Pirkti',
+                value: 'buy',
+                emoji: '🛒'
+            },
+            {
+                label: 'Support',
+                value: 'support',
+                emoji: '🛠️'
+            },
+            {
+                label: 'Refund',
+                value: 'refund',
+                emoji: '💸'
+            }
+        );
 
-    const ticketRow = new ActionRowBuilder().addComponents(ticketButton);
+    const row = new ActionRowBuilder().addComponents(menu);
 
     await ticketChannel.send({
         embeds: [ticketEmbed],
-        components: [ticketRow]
+        components: [row]
     });
 
     console.log('✅ Panels sent');
 });
 
-// ================= CHECK IF USER HAS TICKET =================
+// ================= CHECK OPEN TICKET =================
 async function userHasTicket(guild, userId) {
     const channels = await guild.channels.fetch();
 
@@ -87,7 +106,7 @@ async function userHasTicket(guild, userId) {
     );
 }
 
-// ================= GET NEXT TICKET NUMBER =================
+// ================= GET TICKET NUMBER =================
 async function getNextTicketNumber(guild) {
     const channels = await guild.channels.fetch();
     let max = 0;
@@ -102,14 +121,109 @@ async function getNextTicketNumber(guild) {
     return max + 1;
 }
 
-// ================= INTERACTIONS =================
+// ================= CREATE TICKET =================
+async function createTicket(interaction, type) {
+
+    const guild = interaction.guild;
+    const userId = interaction.user.id;
+
+    const hasTicket = await userHasTicket(guild, userId);
+
+    if (hasTicket) {
+        return interaction.reply({
+            content: '❌ You already have an open ticket!',
+            ephemeral: true
+        });
+    }
+
+    const ticketNumber = await getNextTicketNumber(guild);
+
+    const channel = await guild.channels.create({
+        name: `ticket-${ticketNumber}`,
+        type: 0,
+        parent: TICKET_CATEGORY_ID,
+        permissionOverwrites: [
+            {
+                id: guild.id,
+                deny: [PermissionsBitField.Flags.ViewChannel]
+            },
+            {
+                id: userId,
+                allow: [
+                    PermissionsBitField.Flags.ViewChannel,
+                    PermissionsBitField.Flags.SendMessages,
+                    PermissionsBitField.Flags.ReadMessageHistory
+                ]
+            },
+            {
+                id: ROLE_1,
+                allow: [
+                    PermissionsBitField.Flags.ViewChannel,
+                    PermissionsBitField.Flags.SendMessages,
+                    PermissionsBitField.Flags.ReadMessageHistory
+                ]
+            },
+            {
+                id: ROLE_2,
+                allow: [
+                    PermissionsBitField.Flags.ViewChannel,
+                    PermissionsBitField.Flags.SendMessages,
+                    PermissionsBitField.Flags.ReadMessageHistory
+                ]
+            }
+        ]
+    });
+
+    // ================= TICKET EMBED =================
+    const embed = new EmbedBuilder()
+        .setColor('#ff6600')
+        .setTitle(`🎫 Ticket #${ticketNumber}`)
+        .setDescription(
+            `📦 Type: **${type.toUpperCase()}**\n\n` +
+            `👋 Parašyk savo užklausą.\n` +
+            `💬 Staff greitai atsakys.`
+        );
+
+    const closeBtn = new ButtonBuilder()
+        .setCustomId('close_ticket')
+        .setLabel('Close Ticket')
+        .setStyle(ButtonStyle.Danger);
+
+    const row = new ActionRowBuilder().addComponents(closeBtn);
+
+    await channel.send({
+        content: `<@${userId}> <@&${ROLE_1}> <@&${ROLE_2}>`,
+        embeds: [embed],
+        components: [row]
+    });
+
+    // ================= LOGS =================
+    const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
+
+    const logEmbed = new EmbedBuilder()
+        .setColor('#2b2d31')
+        .setTitle('📊 Ticket Created')
+        .addFields(
+            { name: 'User', value: `<@${userId}>`, inline: true },
+            { name: 'Type', value: type, inline: true },
+            { name: 'Channel', value: `${channel}` }
+        )
+        .setTimestamp();
+
+    await logChannel.send({ embeds: [logEmbed] });
+
+    return interaction.reply({
+        content: `✅ Ticket created: ${channel}`,
+        ephemeral: true
+    });
+}
+
+// ================= EVENTS =================
 client.on(Events.InteractionCreate, async interaction => {
 
-    // ================= VERIFY =================
+    // VERIFY
     if (interaction.isButton() && interaction.customId === 'verify_button') {
-
         const role = interaction.guild.roles.cache.get(VERIFY_ROLE_ID);
-
         await interaction.member.roles.add(role);
 
         return interaction.reply({
@@ -118,90 +232,13 @@ client.on(Events.InteractionCreate, async interaction => {
         });
     }
 
-    // ================= OPEN TICKET =================
-    if (interaction.isButton() && interaction.customId === 'open_ticket') {
-
-        const guild = interaction.guild;
-        const userId = interaction.user.id;
-
-        const hasTicket = await userHasTicket(guild, userId);
-
-        if (hasTicket) {
-            return interaction.reply({
-                content: '❌ You already have an open ticket!',
-                ephemeral: true
-            });
-        }
-
-        const ticketNumber = await getNextTicketNumber(guild);
-
-        const channel = await guild.channels.create({
-            name: `ticket-${ticketNumber}`,
-            type: 0,
-            parent: TICKET_CATEGORY_ID,
-            permissionOverwrites: [
-                {
-                    id: guild.id,
-                    deny: [PermissionsBitField.Flags.ViewChannel]
-                },
-                {
-                    id: userId,
-                    allow: [
-                        PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.SendMessages,
-                        PermissionsBitField.Flags.ReadMessageHistory
-                    ]
-                },
-                {
-                    id: ROLE_1,
-                    allow: [
-                        PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.SendMessages,
-                        PermissionsBitField.Flags.ReadMessageHistory
-                    ]
-                },
-                {
-                    id: ROLE_2,
-                    allow: [
-                        PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.SendMessages,
-                        PermissionsBitField.Flags.ReadMessageHistory
-                    ]
-                }
-            ]
-        });
-
-        // ✅ UPDATED TICKET MESSAGE TEXT
-        const embed = new EmbedBuilder()
-            .setColor('#ff6600')
-            .setTitle(`🛒 Purchase Ticket #${ticketNumber}`)
-            .setDescription(
-                '👋 Ačiū, kad susikūrei užsakymą!\n\n' +
-                '📦 Parašyk ką nori pirkti arba kokio produkto ieškai.\n' +
-                '💬 Galime padėti su kainomis, kiekiais ir pasirinkimu.\n\n' +
-                '🔥 Kuo daugiau informacijos pateiksi, tuo greičiau padėsime.'
-            );
-
-        const closeBtn = new ButtonBuilder()
-            .setCustomId('close_ticket')
-            .setLabel('Close Ticket')
-            .setStyle(ButtonStyle.Danger);
-
-        const row = new ActionRowBuilder().addComponents(closeBtn);
-
-        await channel.send({
-            content: `<@${userId}>`,
-            embeds: [embed],
-            components: [row]
-        });
-
-        return interaction.reply({
-            content: `✅ Ticket created: ${channel}`,
-            ephemeral: true
-        });
+    // CATEGORY SELECT
+    if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category') {
+        const type = interaction.values[0];
+        return createTicket(interaction, type);
     }
 
-    // ================= CLOSE TICKET =================
+    // CLOSE TICKET
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
 
         await interaction.reply({
