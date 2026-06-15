@@ -35,13 +35,13 @@ const ROLE_2 = '1515824249871270051';
 client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
 
-    // ================= VERIFY PANEL =================
+    // VERIFY PANEL
     const verifyChannel = await client.channels.fetch(VERIFY_CHANNEL_ID);
 
     const verifyEmbed = new EmbedBuilder()
         .setColor('#00bfff')
         .setTitle('🔐 Verification')
-        .setDescription('Spausk mygtuką žemiau, kad gautum prieigą prie serverio.');
+        .setDescription('Spausk mygtuką žemiau, kad gautum prieigą.');
 
     const verifyButton = new ButtonBuilder()
         .setCustomId('verify_button')
@@ -55,17 +55,17 @@ client.once('ready', async () => {
         components: [verifyRow]
     });
 
-    // ================= TICKET PANEL =================
+    // TICKET PANEL
     const ticketChannel = await client.channels.fetch(TICKET_PANEL_CHANNEL_ID);
 
     const ticketEmbed = new EmbedBuilder()
         .setColor('#ff6600')
         .setTitle('🎫 Ticket System')
-        .setDescription('Pasirink kategoriją prieš kuriant ticket.');
+        .setDescription('Pasirink kategoriją.');
 
     const menu = new StringSelectMenuBuilder()
         .setCustomId('ticket_category')
-        .setPlaceholder('🎯 Pasirink ticket tipą')
+        .setPlaceholder('🎯 Select ticket type')
         .addOptions(
             {
                 label: 'Buy / Pirkti',
@@ -73,8 +73,8 @@ client.once('ready', async () => {
                 emoji: '🛒'
             },
             {
-                label: 'Support',
-                value: 'support',
+                label: 'Support / Pagalba',
+                value: 'pagalba',
                 emoji: '🛠️'
             }
         );
@@ -89,17 +89,24 @@ client.once('ready', async () => {
     console.log('✅ Panels sent');
 });
 
-// ================= CHECK OPEN TICKET =================
+// ================= FIXED: CHECK IF USER HAS OPEN TICKET =================
 async function userHasTicket(guild, userId) {
     const channels = await guild.channels.fetch();
 
-    return channels.some(ch =>
-        ch &&
-        ch.permissionOverwrites.cache?.some(po => po.id === userId)
-    );
+    return channels.some(ch => {
+        if (!ch || !ch.name) return false;
+
+        const isTicketType =
+            ch.name.startsWith('pirkti-') ||
+            ch.name.startsWith('pagalba-');
+
+        const hasUserAccess = ch.permissionOverwrites.cache?.some(po => po.id === userId);
+
+        return isTicketType && hasUserAccess;
+    });
 }
 
-// ================= COUNT CATEGORY TICKETS =================
+// ================= COUNT PER CATEGORY =================
 async function getCategoryTicketNumber(guild, category) {
     const channels = await guild.channels.fetch();
     let max = 0;
@@ -120,6 +127,7 @@ async function createTicket(interaction, type) {
     const guild = interaction.guild;
     const userId = interaction.user.id;
 
+    // ❌ FIXED DUPLICATE CHECK
     const hasTicket = await userHasTicket(guild, userId);
 
     if (hasTicket) {
@@ -132,7 +140,7 @@ async function createTicket(interaction, type) {
     const ticketNumber = await getCategoryTicketNumber(guild, type);
 
     const channel = await guild.channels.create({
-        name: `${type}-${ticketNumber}`,
+        name: `${type}-${ticketNumber}`, // ✅ FIXED NAMING SYSTEM
         type: 0,
         parent: TICKET_CATEGORY_ID,
         permissionOverwrites: [
@@ -171,9 +179,9 @@ async function createTicket(interaction, type) {
         .setColor('#ff6600')
         .setTitle(`🎫 ${type.toUpperCase()} Ticket #${ticketNumber}`)
         .setDescription(
-            `📦 Category: **${type.toUpperCase()}**\n\n` +
-            `👋 Parašyk savo užklausą.\n` +
-            `💬 Staff greitai atsakys.`
+            `👋 Ticket created.\n` +
+            `📦 Type: ${type.toUpperCase()}\n\n` +
+            `💬 Please explain your request.`
         );
 
     const closeBtn = new ButtonBuilder()
@@ -189,7 +197,7 @@ async function createTicket(interaction, type) {
         components: [row]
     });
 
-    // ================= LOGS =================
+    // LOGS
     const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
 
     const logEmbed = new EmbedBuilder()
@@ -224,13 +232,13 @@ client.on(Events.InteractionCreate, async interaction => {
         });
     }
 
-    // CATEGORY SELECT
+    // SELECT MENU
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category') {
         const type = interaction.values[0];
         return createTicket(interaction, type);
     }
 
-    // CLOSE TICKET
+    // CLOSE
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
 
         await interaction.reply({
