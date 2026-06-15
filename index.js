@@ -18,7 +18,7 @@ const client = new Client({
     ]
 });
 
-// ===== IDS =====
+// ===== IDs =====
 const VERIFY_CHANNEL_ID = '1515833574639669388';
 const VERIFY_ROLE_ID = '1515831883425124412';
 
@@ -124,7 +124,6 @@ client.on(Events.InteractionCreate, async interaction => {
         const guild = interaction.guild;
         const userId = interaction.user.id;
 
-        // ❌ BLOCK IF USER ALREADY HAS TICKET
         const hasTicket = await userHasTicket(guild, userId);
 
         if (hasTicket) {
@@ -172,10 +171,16 @@ client.on(Events.InteractionCreate, async interaction => {
             ]
         });
 
+        // ✅ UPDATED TICKET MESSAGE TEXT
         const embed = new EmbedBuilder()
             .setColor('#ff6600')
-            .setTitle(`🎫 Ticket #${ticketNumber}`)
-            .setDescription('Parašyk savo užklausą čia.');
+            .setTitle(`🛒 Purchase Ticket #${ticketNumber}`)
+            .setDescription(
+                '👋 Ačiū, kad susikūrei užsakymą!\n\n' +
+                '📦 Parašyk ką nori pirkti arba kokio produkto ieškai.\n' +
+                '💬 Galime padėti su kainomis, kiekiais ir pasirinkimu.\n\n' +
+                '🔥 Kuo daugiau informacijos pateiksi, tuo greičiau padėsime.'
+            );
 
         const closeBtn = new ButtonBuilder()
             .setCustomId('close_ticket')
