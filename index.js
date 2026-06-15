@@ -25,16 +25,14 @@ const VERIFY_ROLE_ID = '1515831883425124412';
 const TICKET_PANEL_CHANNEL_ID = '1515828291695673405';
 const TICKET_CATEGORY_ID = '1516043869257597023';
 
-const STAFF_ROLE_1 = '1515830402491879584';
-const STAFF_ROLE_2 = '1515824249871270051';
+const ROLE_1 = '1515830402491879584';
+const ROLE_2 = '1515824249871270051';
 
 // ===== READY =====
 client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
 
-    // =========================
-    // VERIFY PANEL
-    // =========================
+    // ================= VERIFY PANEL =================
     const verifyChannel = await client.channels.fetch(VERIFY_CHANNEL_ID);
 
     const verifyEmbed = new EmbedBuilder()
@@ -47,40 +45,47 @@ client.once('ready', async () => {
         .setLabel('Verify')
         .setStyle(ButtonStyle.Success);
 
-    const verifyRow = new ActionRowBuilder().addComponents(verifyButton);
+    const ticketButton = new ButtonBuilder()
+        .setCustomId('open_ticket')
+        .setLabel('Create Ticket')
+        .setStyle(ButtonStyle.Primary);
+
+    const verifyRow = new ActionRowBuilder().addComponents(verifyButton, ticketButton);
 
     await verifyChannel.send({
         embeds: [verifyEmbed],
         components: [verifyRow]
     });
 
-    // =========================
-    // PURCHASE / TICKET PANEL
-    // =========================
+    // ================= TICKET PANEL =================
     const ticketChannel = await client.channels.fetch(TICKET_PANEL_CHANNEL_ID);
 
-    const ticketPanelEmbed = new EmbedBuilder()
+    const ticketEmbed = new EmbedBuilder()
         .setColor('#ff6600')
-        .setTitle('🛒 Purchase / Pirkti Sistema')
-        .setDescription(
-            'Norėdami pateikti užsakymą arba paklausti apie prekę, spauskite mygtuką žemiau.\n\n' +
-            'To place an order or ask about a product, click the button below.'
-        );
-
-    const ticketButton = new ButtonBuilder()
-        .setCustomId('open_ticket')
-        .setLabel('Create Purchase Ticket')
-        .setStyle(ButtonStyle.Primary);
+        .setTitle('🎫 Ticket System')
+        .setDescription('Spausk mygtuką norėdamas sukurti ticket.');
 
     const ticketRow = new ActionRowBuilder().addComponents(ticketButton);
 
     await ticketChannel.send({
-        embeds: [ticketPanelEmbed],
+        embeds: [ticketEmbed],
         components: [ticketRow]
     });
 
     console.log('✅ Panels sent');
 });
+
+// ===== CHECK IF USER HAS OPEN TICKET =====
+async function userHasTicket(guild, userId) {
+    const channels = await guild.channels.fetch();
+
+    return channels.some(ch =>
+        ch &&
+        ch.name &&
+        ch.name.startsWith('ticket-') &&
+        ch.permissionOverwrites.cache.some(p => p.id === userId)
+    );
+}
 
 // ===== GET NEXT TICKET NUMBER =====
 async function getNextTicketNumber(guild) {
@@ -100,38 +105,39 @@ async function getNextTicketNumber(guild) {
 // ===== INTERACTIONS =====
 client.on(Events.InteractionCreate, async interaction => {
 
-    // =========================
-    // VERIFY SYSTEM
-    // =========================
+    // ================= VERIFY =================
     if (interaction.isButton() && interaction.customId === 'verify_button') {
 
         const role = interaction.guild.roles.cache.get(VERIFY_ROLE_ID);
 
-        if (!role) {
-            return interaction.reply({ content: 'Role not found.', ephemeral: true });
-        }
-
         await interaction.member.roles.add(role);
 
         return interaction.reply({
-            content: '✅ You are verified!',
+            content: '✅ Verified!',
             ephemeral: true
         });
     }
 
-    // =========================
-    // CREATE PURCHASE TICKET
-    // =========================
+    // ================= CREATE TICKET =================
     if (interaction.isButton() && interaction.customId === 'open_ticket') {
 
         const guild = interaction.guild;
-        const user = interaction.user;
+        const userId = interaction.user.id;
+
+        // ❌ CHECK IF USER ALREADY HAS TICKET
+        const hasTicket = await userHasTicket(guild, userId);
+
+        if (hasTicket) {
+            return interaction.reply({
+                content: '❌ You already have an open ticket!',
+                ephemeral: true
+            });
+        }
 
         const ticketNumber = await getNextTicketNumber(guild);
-        const channelName = `ticket-${ticketNumber}`;
 
         const channel = await guild.channels.create({
-            name: channelName,
+            name: `ticket-${ticketNumber}`,
             type: 0,
             parent: TICKET_CATEGORY_ID,
             permissionOverwrites: [
@@ -140,7 +146,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     deny: [PermissionsBitField.Flags.ViewChannel]
                 },
                 {
-                    id: user.id,
+                    id: userId,
                     allow: [
                         PermissionsBitField.Flags.ViewChannel,
                         PermissionsBitField.Flags.SendMessages,
@@ -148,7 +154,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     ]
                 },
                 {
-                    id: STAFF_ROLE_1,
+                    id: ROLE_1,
                     allow: [
                         PermissionsBitField.Flags.ViewChannel,
                         PermissionsBitField.Flags.SendMessages,
@@ -156,7 +162,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     ]
                 },
                 {
-                    id: STAFF_ROLE_2,
+                    id: ROLE_2,
                     allow: [
                         PermissionsBitField.Flags.ViewChannel,
                         PermissionsBitField.Flags.SendMessages,
@@ -166,39 +172,32 @@ client.on(Events.InteractionCreate, async interaction => {
             ]
         });
 
-        const ticketEmbed = new EmbedBuilder()
+        const embed = new EmbedBuilder()
             .setColor('#ff6600')
-            .setTitle(`🛒 Purchase Ticket #${ticketNumber}`)
-            .setDescription(
-                'Parašyk ką nori pirkti / klausti apie produktą.\n\n' +
-                'Write what you want to buy or ask about.'
-            );
+            .setTitle(`🎫 Ticket #${ticketNumber}`)
+            .setDescription('Parašyk savo užklausą čia.');
 
-        const closeButton = new ButtonBuilder()
+        const closeBtn = new ButtonBuilder()
             .setCustomId('close_ticket')
-            .setLabel('Uždaryti / Close')
+            .setLabel('Close Ticket')
             .setStyle(ButtonStyle.Danger);
 
-        const row = new ActionRowBuilder().addComponents(closeButton);
+        const row = new ActionRowBuilder().addComponents(closeBtn);
 
         await channel.send({
-            content: `<@${user.id}>`,
-            embeds: [ticketEmbed],
+            content: `<@${userId}>`,
+            embeds: [embed],
             components: [row]
         });
 
         return interaction.reply({
-            content: `🛒 Purchase ticket created: ${channel}`,
+            content: `✅ Ticket created: ${channel}`,
             ephemeral: true
         });
     }
 
-    // =========================
-    // CLOSE TICKET
-    // =========================
+    // ================= CLOSE TICKET =================
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
-
-        const channel = interaction.channel;
 
         await interaction.reply({
             content: '🔒 Closing ticket...',
@@ -206,7 +205,7 @@ client.on(Events.InteractionCreate, async interaction => {
         });
 
         setTimeout(async () => {
-            await channel.delete().catch(() => {});
+            await interaction.channel.delete().catch(() => {});
         }, 2000);
     }
 });
